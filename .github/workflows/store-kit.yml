@@ -1,0 +1,51 @@
+name: Chrome Web Store kit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - manifest.json
+      - content.js
+      - styles.css
+      - store/**
+      - .github/workflows/store-kit.yml
+
+jobs:
+  build-kit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Capture screenshots and promo tile
+        run: xvfb-run -a node store/capture.mjs
+
+      - name: Build extension zip
+        run: |
+          command -v zip || (sudo apt-get update && sudo apt-get install -y zip)
+          VERSION=$(node -p "require('./manifest.json').version")
+          mkdir -p kit
+          zip -j "kit/github-pr-review-enhancement-v${VERSION}.zip" manifest.json content.js styles.css
+          unzip -l "kit/github-pr-review-enhancement-v${VERSION}.zip"
+          cp promo-tile.png kit/
+          cp -r screenshots kit/
+          cp store/listing.md kit/listing.md
+          ls -laR kit
+
+      - name: Upload kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-web-store-kit
+          path: kit/
+          if-no-files-found: error
+          retention-days: 30
