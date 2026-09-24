@@ -29,15 +29,15 @@ Collapse multi-line comment blocks in GitHub PR diffs to one line. Hover to high
 Reviewing a PR is harder when every function arrives with a wall of comments. This extension collapses each run of multi-line source-code comments in the "Files changed" view into a single line with a +N badge — so you review code, not comment walls.
 
 How it works
-• Auto-collapses comment blocks on page load — works in both the classic (/pull/N/files) and the new (/pull/N/changes) GitHub diff views
+• Auto-collapses comment blocks on page load — works in both the classic and the new GitHub diff views
 • Hover a collapsed block for GitHub's native accent highlight; the full comment text is in the tooltip
 • Click (or press Enter / Space) to expand and re-collapse; the +N / −N badge shows how many lines are hidden
 • Expanded blocks stay expanded while you scroll (virtualization-safe)
 
 Safe by design
 • Only whole-line comments collapse — trailing comments, URLs and strings never trigger
-• Language-aware: JS/TS, Python, Ruby, Go, Rust, Java, C/C++, Lua, SQL, Shell, YAML, TOML, LaTeX, Lisp/Clojure, HTML/Markdown and many more, picked from the file extension
-• JSON, CSV and plain text are never touched; Markdown # headings never collapse
+• The right comment markers are detected automatically from each file's extension, so blocks in the languages used by your project are recognized correctly
+• Formats without comments are left untouched, and Markdown headings are never collapsed
 
 Privacy
 • Zero permissions: no storage, no network requests, no tracking, no analytics. Everything runs locally in your browser.

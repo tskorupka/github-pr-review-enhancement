@@ -51,3 +51,5 @@ Unknown extensions fall back to C-style (`//` + `/* */`), which only ever matche
 ## License
 
 [MIT](LICENSE) © 2026 Tomasz Skorupka
+
+Privacy policy: [PRIVACY.md](PRIVACY.md)
