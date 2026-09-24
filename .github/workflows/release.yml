@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match manifest version
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          echo "manifest=$VERSION tag=$GITHUB_REF_NAME"
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match manifest.json version $VERSION"
+            exit 1
+          fi
+
+  build-kit:
+    needs: verify-version
+    uses: ./.github/workflows/store-kit.yml
+
+  publish-release:
+    needs: build-kit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download kit artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chrome-web-store-kit
+          path: kit
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          EXTRA=""
+          case "$GITHUB_REF_NAME" in *-*) EXTRA="--prerelease";; esac
+
+          cat > notes.md <<EOF
+          ## GitHub PR Review Enhancement ${GITHUB_REF_NAME}
+
+          **Store package:** \`github-pr-review-enhancement-${GITHUB_REF_NAME}.zip\`
+          Upload it to the [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole) as-is.
+
+          ### Assets
+          | File | Purpose |
+          |---|---|
+          | \`github-pr-review-enhancement-${GITHUB_REF_NAME}.zip\` | Extension package (manifest + content script + styles + icons) |
+          | \`icon-128.png\` | Store icon (128×128) |
+          | \`promo-tile.png\` | Promo tile (440×280) |
+          | \`screenshots/*.png\` | Store screenshots (1280×800) |
+          | \`listing.md\` | Paste-ready listing copy |
+
+          ### Install locally
+          1. Unzip the package
+          2. \`chrome://extensions\` → Developer mode → **Load unpacked** → select the unzipped folder
+
+          [Privacy policy](https://github.com/${{ github.repository }}/blob/main/PRIVACY.md) · [MIT license](https://github.com/${{ github.repository }}/blob/main/LICENSE) · version ${VER}
+          EOF
+
+          mapfile -t FILES < <(find kit -type f | sort)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${FILES[@]}" --clobber
+          else
+            FLAGS=""
+            [ -n "$EXTRA" ] && FLAGS="$EXTRA"
+            gh release create "$GITHUB_REF_NAME" \
+              --title "GitHub PR Review Enhancement ${GITHUB_REF_NAME}" \
+              --notes-file notes.md \
+              $FLAGS \
+              "${FILES[@]}"
+          fi
+          gh release view "$GITHUB_REF_NAME" --json name,url,assets --jq '{name,url,assets:[.assets[].name]}'
