@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub PR Review Enhancement",
+  "version": "0.4.1",
+  "description": "Collapses multi-line source-code comment blocks in GitHub PR diffs to one line. Hover to highlight, click to expand.",
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

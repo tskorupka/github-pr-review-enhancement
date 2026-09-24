@@ -1,0 +1,5 @@
+# Local test fixture: saved GitHub page DOM — contains session material
+# and account identifiers; never commit.
+snapshot.html
+
+.DS_Store
