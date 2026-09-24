@@ -35,9 +35,11 @@ jobs:
           command -v zip || (sudo apt-get update && sudo apt-get install -y zip)
           VERSION=$(node -p "require('./manifest.json').version")
           mkdir -p kit
-          zip -j "kit/github-pr-review-enhancement-v${VERSION}.zip" manifest.json content.js styles.css
+          zip -X "kit/github-pr-review-enhancement-v${VERSION}.zip" \
+            manifest.json content.js styles.css icons/icon-16.png icons/icon-32.png icons/icon-48.png icons/icon-128.png
           unzip -l "kit/github-pr-review-enhancement-v${VERSION}.zip"
           cp promo-tile.png kit/
+          cp icons/icon-128.png kit/icon-128.png
           cp -r screenshots kit/
           cp store/listing.md kit/listing.md
           ls -laR kit

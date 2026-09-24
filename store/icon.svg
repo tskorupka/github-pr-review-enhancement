@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- collapsed comment lines -->
+  <rect x="24" y="40" width="80" height="11" rx="5.5" fill="#6e7681"/>
+  <rect x="24" y="59" width="64" height="11" rx="5.5" fill="#6e7681"/>
+  <rect x="24" y="78" width="72" height="11" rx="5.5" fill="#3fb950"/>
+  <!-- +N badge -->
+  <circle cx="98" cy="83.5" r="18" fill="#1f6feb"/>
+  <rect x="90" y="81" width="16" height="5" rx="2.5" fill="#ffffff"/>
+  <rect x="95.5" y="75.5" width="5" height="16" rx="2.5" fill="#ffffff"/>
+</svg>

@@ -2,6 +2,10 @@
 
 Paste-ready fields for the Developer Dashboard.
 
+**Icon:** upload `icon-128.png` from this kit (128×128).
+**Promo tile:** upload `promo-tile.png` (440×280).
+**Screenshots:** upload the PNGs in `screenshots/` (1280×800).
+
 ## Fields
 
 **Name** (≤45 chars):

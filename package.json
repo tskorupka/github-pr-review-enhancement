@@ -2,6 +2,7 @@
   "name": "github-pr-review-enhancement",
   "version": "0.4.1",
   "private": true,
+  "license": "MIT",
   "description": "Chrome extension: collapse multi-line comment blocks in GitHub PR diffs. This package holds dev tooling only (store asset capture).",
   "type": "module",
   "scripts": {

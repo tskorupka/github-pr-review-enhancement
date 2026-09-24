@@ -45,4 +45,9 @@ Unknown extensions fall back to C-style (`//` + `/* */`), which only ever matche
 - `manifest.json` — MV3 manifest, content script on `https://github.com/*`
 - `content.js` — language rules, diff scanning, grouping, expand/collapse
 - `styles.css` — Primer-token styling for badges, hover, animation
+- `icons/` — extension & store icon (16/32/48/128 px)
 - `demo.gif` — the recording above
+
+## License
+
+[MIT](LICENSE) © 2026 Tomasz Skorupka
