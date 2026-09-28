@@ -235,10 +235,36 @@
 
   function makeClassifier(rules) {
     let inBlock = null;
-    return function classify(raw) {
+    // A block left open at a hunk/group boundary is only "tentative": the next
+    // hunk may be an unrelated source region, so the carry-over must be
+    // confirmed by the first non-blank line looking like a continuation
+    // (starts with the close marker, or with "*" for *-terminated blocks).
+    let tentative = null;
+    // True while a run contains tentatively-confirmed lines whose block has
+    // not closed yet — such a run may not become a group (safety net).
+    let pendingClose = false;
+    function classify(raw) {
       const t = raw.trim();
+      if (tentative !== null) {
+        if (!t) return "empty"; // blank first line: keep waiting
+        const starOk = tentative.startsWith("*");
+        if (t.startsWith(tentative) || (starOk && t.startsWith("*"))) {
+          inBlock = tentative;
+          tentative = null;
+          pendingClose = true;
+          if (t.includes(inBlock)) {
+            inBlock = null;
+            pendingClose = false;
+          }
+          return "comment";
+        }
+        tentative = null; // unrelated region — drop the carry-over
+      }
       if (inBlock) {
-        if (t.includes(inBlock)) inBlock = null;
+        if (t.includes(inBlock)) {
+          inBlock = null;
+          pendingClose = false;
+        }
         return "comment";
       }
       if (!t) return "empty";
@@ -252,7 +278,28 @@
         }
       }
       return "code";
+    }
+    // Mark a boundary (hunk header, non-content row): an open block becomes
+    // tentative instead of silently swallowing the next region. With no open
+    // block, arm a blind tentative for *-led close markers: a hunk may start
+    // inside a block comment whose opener sits in hidden context.
+    classify.breakAt = function () {
+      if (inBlock) {
+        tentative = inBlock;
+        inBlock = null;
+      } else if (tentative === null) {
+        for (const pair of rules.blocks) {
+          if (pair[1].startsWith("*")) {
+            tentative = pair[1];
+            break;
+          }
+        }
+      }
     };
+    classify.needsClose = function () {
+      return pendingClose;
+    };
+    return classify;
   }
 
   /* ---------- DOM helpers ---------- */
@@ -426,26 +473,55 @@
   }
 
   function classifyRows(rows, rules) {
-    let classifiers = [];
+    // Classifiers persist for the whole file so block-comment state survives
+    // across runs; boundaries (hunks, grouped rows) are signalled explicitly.
+    const classifiers = [];
     let run = [];
+    let runNeedsClose = false;
+    let runAllStarred = true;
     const flush = () => {
-      if (run.length >= 2) createGroup(run);
+      // A run whose block comment never closed inside it may only group when
+      // every row is continuation-shaped ("*"-led or blank) — a mis-confirmed
+      // code region (operator-wrapped "* factor" lines) would swallow rows of
+      // other shapes and fail this check, staying visible.
+      if (run.length >= 2 && (!runNeedsClose || runAllStarred)) createGroup(run);
       run = [];
-      classifiers = [];
+      runNeedsClose = false;
+      runAllStarred = true;
+    };
+    const breakAll = () => classifiers.forEach((c) => c.breakAt());
+    const textNoBadge = (cell) => {
+      const badge = cell.querySelector(".gpre-badge");
+      let t = cellText(cell);
+      if (badge) t = t.slice(0, t.length - badge.textContent.length);
+      return t;
+    };
+    // Replay already-grouped rows through the classifier (without adding them
+    // to the run) so a block they leave open is known to the rows that follow
+    // — matters when virtualization re-creates rows around existing groups.
+    const feedGrouped = (tr) => {
+      const cells = tr.querySelectorAll(CELL_SEL);
+      cells.forEach((cell, i) => {
+        if (!classifiers[i]) classifiers[i] = makeClassifier(rules);
+        classifiers[i](textNoBadge(cell));
+      });
     };
 
     for (const tr of rows) {
       if (tr.hasAttribute(GROUP)) {
         flush();
+        feedGrouped(tr);
         continue;
       }
       if (isStructural(tr)) {
         flush();
+        breakAll();
         continue;
       }
       const cells = tr.querySelectorAll(CELL_SEL);
       if (cells.length === 0) {
         flush();
+        breakAll();
         continue;
       }
       const kinds = [];
@@ -458,6 +534,7 @@
       });
       if (texts.some((t) => t.trim().startsWith("@@"))) {
         flush();
+        breakAll();
         continue;
       }
       const nonEmpty = kinds.filter((k) => k !== "empty");
@@ -465,8 +542,16 @@
         flush();
         continue;
       }
-      if (nonEmpty.every((k) => k === "comment")) run.push({ tr, texts });
-      else flush();
+      if (nonEmpty.every((k) => k === "comment")) {
+        run.push({ tr, texts });
+        runNeedsClose = classifiers.some((c) => c.needsClose());
+        runAllStarred =
+          runAllStarred &&
+          texts.every((tt) => {
+            const x = tt.trim();
+            return x === "" || x.startsWith("*");
+          });
+      } else flush();
     }
     flush();
   }
