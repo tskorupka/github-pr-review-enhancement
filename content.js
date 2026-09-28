@@ -27,6 +27,7 @@
   // immune regardless of language.
   const R = {
     C: () => ({ lines: ["//"], blocks: [["/*", "*/"]] }), // c-family
+    C_JSX: () => ({ lines: ["//"], blocks: [["/*", "*/"], ["{/*", "*/}"]] }), // tsx/jsx: also {/* … */}
     LINEONLY_C: () => ({ lines: ["//"], blocks: [] }), // zig, d…
     CSS: () => ({ lines: [], blocks: [["/*", "*/"]] }),
     HASH: () => ({ lines: ["#"], blocks: [] }), // py rb sh yaml toml…
@@ -49,7 +50,7 @@
 
   const EXT_RULES = {
     // C-family
-    js: R.C, jsx: R.C, mjs: R.C, cjs: R.C, ts: R.C, tsx: R.C, mts: R.C, cts: R.C,
+    js: R.C, jsx: R.C_JSX, mjs: R.C, cjs: R.C, ts: R.C, tsx: R.C_JSX, mts: R.C, cts: R.C,
     java: R.C, kt: R.C, kts: R.C, scala: R.C, cs: R.C, c: R.C, h: R.C, cc: R.C,
     cpp: R.C, hpp: R.C, hxx: R.C, cxx: R.C, go: R.C, rs: R.C, swift: R.C,
     dart: R.C,     groovy: R.C, gradle: R.C, sol: R.C, hx: R.C, as: R.C, pde: R.C,
@@ -143,8 +144,8 @@
 
   // GitHub's own language ids (data-tagsearch-lang) and display names.
   const LANG_RULES = {
-    javascript: R.C, typescript: R.C, "typescriptreact": R.C,
-    javascriptreact: R.C, tsx: R.C, jsx: R.C, java: R.C, csharp: R.C, c: R.C,
+    javascript: R.C, typescript: R.C, "typescriptreact": R.C_JSX,
+    javascriptreact: R.C_JSX, tsx: R.C_JSX, jsx: R.C_JSX, java: R.C, csharp: R.C, c: R.C,
     "c++": R.C, "objective-c": R.C, "objective-c++": R.C, go: R.C, rust: R.C,
     kotlin: R.C, swift: R.C, scala: R.C, dart: R.C, groovy: R.C, gradle: R.C,
     solidity: R.C, haxe: R.C, actionscript: R.C, processing: R.C, arduino: R.C,
@@ -259,6 +260,7 @@
           return "comment";
         }
         tentative = null; // unrelated region — drop the carry-over
+        pendingClose = false; // the abandoned block no longer needs a close
       }
       if (inBlock) {
         if (t.includes(inBlock)) {
@@ -479,6 +481,12 @@
     let run = [];
     let runNeedsClose = false;
     let runAllStarred = true;
+    // A boundary may be followed by comment-continuation rows whose opener sits
+    // in hidden context. Classifiers are created lazily, so remember the
+    // boundary and blind-arm any classifier created after it — otherwise a file
+    // diff that STARTS with a hunk header would never arm (no classifier exists
+    // yet when breakAll runs).
+    let pendingBoundary = false;
     const flush = () => {
       // A run whose block comment never closed inside it may only group when
       // every row is continuation-shaped ("*"-led or blank) — a mis-confirmed
@@ -489,7 +497,17 @@
       runNeedsClose = false;
       runAllStarred = true;
     };
-    const breakAll = () => classifiers.forEach((c) => c.breakAt());
+    const boundary = () => {
+      classifiers.forEach((c) => c.breakAt());
+      pendingBoundary = true;
+    };
+    const getClass = (i) => {
+      if (!classifiers[i]) {
+        classifiers[i] = makeClassifier(rules);
+        if (pendingBoundary) classifiers[i].breakAt();
+      }
+      return classifiers[i];
+    };
     const textNoBadge = (cell) => {
       const badge = cell.querySelector(".gpre-badge");
       let t = cellText(cell);
@@ -502,8 +520,7 @@
     const feedGrouped = (tr) => {
       const cells = tr.querySelectorAll(CELL_SEL);
       cells.forEach((cell, i) => {
-        if (!classifiers[i]) classifiers[i] = makeClassifier(rules);
-        classifiers[i](textNoBadge(cell));
+        getClass(i)(textNoBadge(cell));
       });
     };
 
@@ -515,26 +532,26 @@
       }
       if (isStructural(tr)) {
         flush();
-        breakAll();
+        boundary();
         continue;
       }
       const cells = tr.querySelectorAll(CELL_SEL);
       if (cells.length === 0) {
         flush();
-        breakAll();
+        boundary();
         continue;
       }
       const kinds = [];
       const texts = [];
       cells.forEach((cell, i) => {
-        if (!classifiers[i]) classifiers[i] = makeClassifier(rules);
         const text = cellText(cell);
         texts.push(text);
-        kinds.push(classifiers[i](text));
+        kinds.push(getClass(i)(text));
       });
+      pendingBoundary = false;
       if (texts.some((t) => t.trim().startsWith("@@"))) {
         flush();
-        breakAll();
+        boundary();
         continue;
       }
       const nonEmpty = kinds.filter((k) => k !== "empty");
